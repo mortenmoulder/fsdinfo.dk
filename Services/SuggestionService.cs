@@ -75,10 +75,20 @@ public sealed class SuggestionService : ISuggestionService
         };
 
         using var smtp = new SmtpClient();
-        await smtp.ConnectAsync(smtpHost, smtpPort, SecureSocketOptions.Auto);
-        if (!string.IsNullOrEmpty(smtpUser))
-            await smtp.AuthenticateAsync(smtpUser, smtpPass ?? string.Empty);
-        await smtp.SendAsync(message);
-        await smtp.DisconnectAsync(true);
+        try
+        {
+            await smtp.ConnectAsync(smtpHost, smtpPort, SecureSocketOptions.Auto);
+            if (!string.IsNullOrEmpty(smtpUser))
+                await smtp.AuthenticateAsync(smtpUser, smtpPass ?? string.Empty);
+            await smtp.SendAsync(message);
+            await smtp.DisconnectAsync(true);
+            _logger.LogInformation("Suggestion email sent to {To}", to);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send suggestion email. Host={Host} Port={Port} From={From} To={To}",
+                smtpHost, smtpPort, from, to);
+            throw;
+        }
     }
 }

@@ -1,8 +1,20 @@
 using FSDInfo.Components;
 using FSDInfo.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+using Serilog;
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .WriteTo.File(
+        Path.Combine(AppContext.BaseDirectory, "logs", "app-.log"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 
 // Disable HTTP/3 — Passenger proxies to Kestrel over HTTP/1.1; advertising QUIC breaks browser reconnects
 builder.WebHost.ConfigureKestrel(options =>
