@@ -20,11 +20,13 @@ jobs:
       - name: Publish
         run: dotnet publish FSDInfo.csproj -c Release -o ./publish
 
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BUILD_DEPLOY_KEY }}
+
       - name: Push artifacts to build repo
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.BUILD_DEPLOY_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
           cd ./publish
@@ -34,4 +36,4 @@ jobs:
           git add .
           git commit -m "Deploy from ${{ github.sha }}"
           git remote add origin git@github.com:mortenmoulder/fsdinfo.dk-build.git
-          git push --force origin HEAD:main
+          git push --force origin HEAD:master
