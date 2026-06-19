@@ -1,5 +1,6 @@
 using FSDInfo.Components;
 using FSDInfo.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,10 +12,15 @@ builder.Services.AddRazorComponents()
 // Register vehicle lookup service
 builder.Services.AddHttpClient<IVehicleService, VehicleService>(client =>
 {
-    var baseUrl = builder.Configuration["VehicleApi:BaseUrl"] ?? "https://api.motorregistret.dk/v1/";
+    var baseUrl = builder.Configuration["VehicleApi:BaseUrl"];
     client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(10);
 });
+
+// Persist data protection keys so all Passenger worker processes share the same keys
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "dp-keys")))
+    .SetApplicationName("FSDInfo");
 
 var app = builder.Build();
 
