@@ -17,6 +17,9 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Register suggestion service (uses the shared IHttpClientFactory)
+builder.Services.AddScoped<ISuggestionService, SuggestionService>();
+
 // Register vehicle lookup service
 builder.Services.AddHttpClient<IVehicleService, VehicleService>(client =>
 {

@@ -1,6 +1,9 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @inject IVehicleService VehicleService
+@inject ISuggestionService SuggestionService
+@inject IJSRuntime JS
+@inject IConfiguration Config
 
 <PageTitle>Tesla FSD i Danmark</PageTitle>
 
@@ -282,6 +285,70 @@
     </div>
 </section>
 
+<!-- Send et forslag -->
+<section class="section section-alt">
+    <div class="container">
+        <h2 class="section-title">Send et forslag</h2>
+        <p class="section-sub">Har du viden om FSD i Danmark, eller mangler der information på siden? Send et forslag – jeg kigger på det.</p>
+
+        @if (_sgSent)
+        {
+            <div class="result-card result-yes" style="max-width:600px;margin:0 auto">
+                <div class="result-icon">✓</div>
+                <div class="result-body">
+                    <h3>Tak for dit forslag!</h3>
+                    <p>Jeg kigger på det snarest.</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="suggestion-form-wrap">
+                <div class="sg-group">
+                    <label class="sg-label">Navn <span class="sg-optional">(valgfrit)</span></label>
+                    <input class="sg-input" type="text" @bind="_sgName" placeholder="Dit navn" maxlength="100" />
+                </div>
+                <div class="sg-group">
+                    <label class="sg-label">E-mail <span class="sg-optional">(valgfrit, så jeg kan svare)</span></label>
+                    <input class="sg-input" type="email" @bind="_sgEmail" placeholder="din@email.dk" maxlength="200" />
+                </div>
+                <div class="sg-group">
+                    <label class="sg-label">Forslag <span class="sg-required">*</span></label>
+                    <textarea class="sg-input" @bind="_sgMessage" rows="5" placeholder="Hvad vil du gerne tilføje eller ændre?" maxlength="2000"></textarea>
+                    @if (_sgMessageError is not null)
+                    {
+                        <div class="sg-field-error">@_sgMessageError</div>
+                    }
+                </div>
+
+                <!-- Honeypot – bots fill this in, humans don't see it -->
+                <div style="display:none" aria-hidden="true">
+                    <input type="text" @bind="_sgHoneypot" tabindex="-1" autocomplete="off" />
+                </div>
+
+                <div id="turnstile-container"></div>
+
+                @if (_sgError is not null)
+                {
+                    <div class="error-msg">@_sgError</div>
+                }
+
+                <button class="btn-submit" @onclick="SubmitSuggestion" disabled="@_sgLoading">
+                    @if (_sgLoading)
+                    {
+                        <span class="spinner"></span>
+                        <span>Sender…</span>
+                    }
+                    else
+                    {
+                        <span>Send forslag</span>
+                    }
+                </button>
+            </div>
+        }
+    </div>
+</section>
+
 <footer class="site-footer">
     <div class="container">
         <p>Dette er en uofficiel informationsside om Tesla FSD i Danmark. Oplysningerne er vejledende.</p>
@@ -291,6 +358,84 @@
 </footer>
 
 @code {
+    // ── Suggestion form ──────────────────────────────────────────────────────
+    private string _turnstileSiteKey = string.Empty;
+    private string _sgName = string.Empty;
+    private string _sgEmail = string.Empty;
+    private string _sgMessage = string.Empty;
+    private string _sgHoneypot = string.Empty;
+    private bool _sgSent;
+    private bool _sgLoading;
+    private string? _sgError;
+    private string? _sgMessageError;
+
+    protected override void OnInitialized()
+    {
+        _turnstileSiteKey = Config["Turnstile:SiteKey"] ?? string.Empty;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !string.IsNullOrEmpty(_turnstileSiteKey))
+            await JS.InvokeVoidAsync("fsdInitTurnstile", _turnstileSiteKey);
+    }
+
+    private async Task SubmitSuggestion()
+    {
+        _sgError = null;
+        _sgMessageError = null;
+
+        // Honeypot — silently succeed so bots think they succeeded
+        if (!string.IsNullOrEmpty(_sgHoneypot))
+        {
+            _sgSent = true;
+            return;
+        }
+
+        var msg = _sgMessage.Trim();
+        if (msg.Length < 10)
+        {
+            _sgMessageError = "Forslaget skal være mindst 10 tegn.";
+            return;
+        }
+
+        _sgLoading = true;
+        try
+        {
+            var token = await JS.InvokeAsync<string>("fsdGetTurnstileToken");
+            if (string.IsNullOrEmpty(token))
+            {
+                _sgError = "Udfyld venligst captcha-feltet.";
+                return;
+            }
+
+            if (!await SuggestionService.VerifyTurnstileAsync(token))
+            {
+                _sgError = "Captcha-verificering fejlede. Prøv igen.";
+                await JS.InvokeVoidAsync("fsdResetTurnstile");
+                return;
+            }
+
+            await SuggestionService.SendEmailAsync(new SuggestionInput(
+                string.IsNullOrWhiteSpace(_sgName) ? null : _sgName.Trim(),
+                string.IsNullOrWhiteSpace(_sgEmail) ? null : _sgEmail.Trim(),
+                msg
+            ));
+
+            _sgSent = true;
+        }
+        catch
+        {
+            _sgError = "Der opstod en fejl. Prøv igen senere.";
+            await JS.InvokeVoidAsync("fsdResetTurnstile");
+        }
+        finally
+        {
+            _sgLoading = false;
+        }
+    }
+
+    // ── Hardware check ───────────────────────────────────────────────────────
     private enum HwSelection { None, HW3, HW4, Unknown }
 
     private HwSelection SelectedHW { get; set; } = HwSelection.None;
