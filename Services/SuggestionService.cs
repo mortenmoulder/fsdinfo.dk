@@ -78,7 +78,7 @@ public sealed class SuggestionService : ISuggestionService
         try
         {
             var useSsl = bool.TryParse(_config["Email:UseSsl"], out var ssl) && ssl;
-            var socketOptions = useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.None;
+            var socketOptions = useSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
 
             await smtp.ConnectAsync(smtpHost, smtpPort, socketOptions);
             if (!string.IsNullOrEmpty(smtpUser))
