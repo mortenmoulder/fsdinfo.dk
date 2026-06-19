@@ -1,9 +1,17 @@
 using FSDInfo.Components;
 using FSDInfo.Services;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Disable HTTP/3 — Passenger proxies to Kestrel over HTTP/1.1; advertising QUIC breaks browser reconnects
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ConfigureEndpointDefaults(listenOptions =>
+    {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2;
+    });
+});
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -16,11 +24,6 @@ builder.Services.AddHttpClient<IVehicleService, VehicleService>(client =>
     client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(10);
 });
-
-// Persist data protection keys so all Passenger worker processes share the same keys
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "dp-keys")))
-    .SetApplicationName("FSDInfo");
 
 var app = builder.Build();
 
