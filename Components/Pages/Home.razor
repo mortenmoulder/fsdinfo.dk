@@ -1,0 +1,347 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject IVehicleService VehicleService
+
+<PageTitle>Tesla FSD i Danmark</PageTitle>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="hero-bg"></div>
+    <div class="container">
+        <div class="hero-content">
+            <div class="tesla-t">T</div>
+            <div>
+                <h1 class="hero-title">Tesla FSD Supervised</h1>
+                <p class="hero-sub">Status og information om FSD i Danmark</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Status i Danmark -->
+<section class="section">
+    <div class="container">
+        <div class="status-card">
+            <div class="status-badge working">
+                <span class="status-dot"></span>
+                Virker – endnu ikke endeligt lovliggjort
+            </div>
+            <p>
+                <strong>Tesla FSD Supervised virker</strong> på biler med <strong>Hardware 4 (HW4)</strong> og software
+                version <strong>2026.17.5</strong> eller nyere. Funktionen kræver at du er opmærksom, ikke fjerner blikket fra vejen tit og ikke sidder med mobiltelefonen i hånden.
+            </p>
+            <p>
+                <strong>Regeringen</strong> har endnu ikke bekræftet en officiel 100% godkendelse af FSD i Danmark.
+            </p>
+        </div>
+
+        <div class="requirements-grid">
+            <div class="req-card req-green">
+                <div class="req-icon">💻</div>
+                <div class="req-label">Minimum software</div>
+                <div class="req-value">2026.17.5</div>
+            </div>
+            <div class="req-card req-green">
+                <div class="req-icon">🔧</div>
+                <div class="req-label">Hardware</div>
+                <div class="req-value">HW4 påkrævet</div>
+            </div>
+            <div class="req-card req-yellow">
+                <div class="req-icon">⚖️</div>
+                <div class="req-label">Lovgivning</div>
+                <div class="req-value">Ikke officielt godkendt</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Understøtter min bil FSD? -->
+<section class="section section-alt">
+    <div class="container">
+        <h2 class="section-title">Understøtter min bil FSD?</h2>
+        <p class="section-sub">Vælg din hardware, eller lad os slå det op via din nummerplade.</p>
+
+        <div class="hw-selector">
+            <button class="hw-btn @(SelectedHW == HwSelection.HW3 ? "active hw3-active" : "")"
+                    @onclick="() => Select(HwSelection.HW3)">
+                <span class="hw-btn-main">HW3</span>
+                <span class="hw-btn-sub">Hardware 3</span>
+            </button>
+            <button class="hw-btn @(SelectedHW == HwSelection.HW4 ? "active hw4-active" : "")"
+                    @onclick="() => Select(HwSelection.HW4)">
+                <span class="hw-btn-main">HW4</span>
+                <span class="hw-btn-sub">Hardware 4</span>
+            </button>
+            <button class="hw-btn @(SelectedHW == HwSelection.Unknown ? "active unknown-active" : "")"
+                    @onclick="() => Select(HwSelection.Unknown)">
+                <span class="hw-btn-main">?</span>
+                <span class="hw-btn-sub">Ved ikke</span>
+            </button>
+        </div>
+
+        @if (SelectedHW == HwSelection.HW3)
+        {
+            <div class="result-card result-no">
+                <div class="result-icon">✕</div>
+                <div class="result-body">
+                    <h3>Din bil understøtter ikke FSD</h3>
+                    <p>Biler med Hardware 3 (HW3) kan ikke køre Tesla FSD. Du skal have en bil med <strong>Hardware 4 (HW4)</strong> for at bruge FSD.</p>
+                    <p>Det er ikke muligt at opgradere en eksisterende bil fra HW3 til HW4.</p>
+                </div>
+            </div>
+        }
+
+        @if (SelectedHW == HwSelection.HW4)
+        {
+            <div class="result-card result-yes">
+                <div class="result-icon">✓</div>
+                <div class="result-body">
+                    <h3>Din bil understøtter FSD Supervised!</h3>
+                    <p>Din bil har Hardware 4 (HW4) – FSD Supervised virker på din bil.</p>
+                    <p>Sørg for at din bil kører minimum software version <strong>2026.17.5</strong>.</p>
+                    <div class="inline-warning">
+                        ⚠️ FSD Supervised kræver opmærksomhed bag rattet til enhver tid. Regeringen har endnu ikke endeligt lovliggjort FSD i Danmark – brug funktionen med omtanke.
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (SelectedHW == HwSelection.Unknown)
+        {
+            <div class="plate-section">
+                <p class="plate-label">Indtast din nummerplade, så slår vi det op:</p>
+                <div class="plate-input-wrap">
+                    <span class="plate-dk-flag">🇩🇰</span>
+                    <span class="plate-dk-text">DK</span>
+                    <input class="plate-input"
+                           type="text"
+                           placeholder="AB 12 345"
+                           maxlength="10"
+                           @bind="LicensePlate"
+                           @bind:event="oninput"
+                           @onkeydown="OnPlateKeyDown" />
+                </div>
+                <button class="btn-submit"
+                        @onclick="CheckPlate"
+                        disabled="@(IsLoading || string.IsNullOrWhiteSpace(LicensePlate))">
+                    @if (IsLoading)
+                    {
+                        <span class="spinner"></span>
+                        <span>Tjekker nummerplade…</span>
+                    }
+                    else
+                    {
+                        <span>Tjek hardware</span>
+                    }
+                </button>
+
+                @if (PlateError is not null)
+                {
+                    <div class="error-msg">@PlateError</div>
+                }
+
+                @if (PlateResult is not null)
+                {
+                    @if (PlateResult.HasVehicleInfo)
+                    {
+                        <div class="vehicle-info-card">
+                            <div class="vi-row">
+                                <span class="vi-label">Køretøj</span>
+                                <span class="vi-value">Tesla @PlateResult.ModelNavn</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(PlateResult.VariantNavn))
+                            {
+                                <div class="vi-row">
+                                    <span class="vi-label">Variant</span>
+                                    <span class="vi-value">@PlateResult.VariantNavn</span>
+                                </div>
+                            }
+                            <div class="vi-row">
+                                <span class="vi-label">Modelår</span>
+                                <span class="vi-value">@PlateResult.ModelAar</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(PlateResult.FarveNavn))
+                            {
+                                <div class="vi-row">
+                                    <span class="vi-label">Farve</span>
+                                    <span class="vi-value">@PlateResult.FarveNavn</span>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(PlateResult.DrivkraftNavn))
+                            {
+                                <div class="vi-row">
+                                    <span class="vi-label">Drivkraft</span>
+                                    <span class="vi-value">@PlateResult.DrivkraftNavn</span>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (PlateResult.HardwareResult == VehicleHardwareResult.HW4)
+                    {
+                        <div class="result-card result-yes">
+                            <div class="result-icon">✓</div>
+                            <div class="result-body">
+                                <h3>Din Tesla har HW4</h3>
+                                <p>Ud fra bilens data er det en <strong>Model 3 Highland</strong> eller <strong>Model Y Juniper</strong> – begge leveres med Hardware 4.</p>
+                                <p>Sørg for at have minimum software version <strong>2026.17.5</strong> installeret.</p>
+                            </div>
+                        </div>
+                    }
+                    else if (PlateResult.HardwareResult == VehicleHardwareResult.ProbablyHW3)
+                    {
+                        <div class="result-card result-maybe">
+                            <div class="result-icon">?</div>
+                            <div class="result-body">
+                                <h3>Sandsynligvis HW3</h3>
+                                <p>Bilen er fra <strong>@PlateResult.ModelAar</strong> og er sandsynligvis en pre-Juniper Model Y med <strong>Hardware 3</strong>. Tesla begyndte dog at installere HW4-chippen i nogle biler fra 2024, så det kan ikke udelukkes.</p>
+                                <p>Tjek det direkte i bilen – se vejledningen i afsnittet <em>"Hvor finder jeg min hardware version?"</em> herunder.</p>
+                            </div>
+                        </div>
+                    }
+                    else if (PlateResult.HardwareResult == VehicleHardwareResult.HW3)
+                    {
+                        <div class="result-card result-no">
+                            <div class="result-icon">✕</div>
+                            <div class="result-body">
+                                <h3>Din Tesla har HW3</h3>
+                                <p>Bilen er fra <strong>@PlateResult.ModelAar</strong>. Ud fra årstal og model er det næsten sikkert <strong>Hardware 3</strong>, som ikke understøtter FSD Supervised.</p>
+                            </div>
+                        </div>
+                    }
+                    else if (PlateResult.HardwareResult == VehicleHardwareResult.Unknown)
+                    {
+                        <div class="result-card result-maybe">
+                            <div class="result-icon">?</div>
+                            <div class="result-body">
+                                <h3>Usikkert – tjek i bilen</h3>
+                                <p>Vi kan ikke afgøre hardware-versionen med sikkerhed. Bilen er fra <strong>@PlateResult.ModelAar</strong> og kan have enten HW3 eller HW4 afhængigt af præcis produktionsdato.</p>
+                                <p>Tjek det direkte i bilen – se vejledningen i afsnittet <em>"Hvor finder jeg min hardware version?"</em> herunder.</p>
+                            </div>
+                        </div>
+                    }
+                    else if (PlateResult.HardwareResult == VehicleHardwareResult.NotTesla)
+                    {
+                        <div class="result-card result-no">
+                            <div class="result-icon">✕</div>
+                            <div class="result-body">
+                                <h3>Ikke en Tesla</h3>
+                                <p>Den angivne nummerplade tilhører ikke en Tesla. FSD er udelukkende en Tesla-funktion.</p>
+                            </div>
+                        </div>
+                    }
+                    else if (PlateResult.HardwareResult == VehicleHardwareResult.ApiError)
+                    {
+                        <div class="result-card result-maybe">
+                            <div class="result-icon">⚠</div>
+                            <div class="result-body">
+                                <h3>Opslag ikke muligt</h3>
+                                <p>Vi kunne ikke hente køretøjsoplysninger i øjeblikket. Prøv igen om lidt, eller tjek hardware-versionen manuelt i din Tesla.</p>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        }
+    </div>
+</section>
+
+<!-- Hvor finder jeg min hardware version? -->
+<section class="section">
+    <div class="container">
+        <h2 class="section-title">Hvor finder jeg min hardware version?</h2>
+        <p class="section-sub">Følg nedenstående trin i din Tesla for at finde hardware-versionen.</p>
+
+        <div class="hw-info-card">
+            <h3>Sådan finder du din hardware version</h3>
+            <ol class="steps">
+                <li>Tryk på <strong>bil-menuen</strong> (bil-ikonet) nederst til venstre på touchskærmen</li>
+                <li>Vælg <strong>Software</strong></li>
+                <li>Se hvad der vises under <strong>Full Self-Driving-computer</strong></li>
+            </ol>
+            <div class="hw-result-list">
+                <div class="hw-result-row hw3-row">
+                    <span class="hw-badge hw3-badge">HW3</span>
+                    <span class="hw-result-text"><strong>"Full Self-Driving-computer 3"</strong> – understøtter <strong>ikke</strong> FSD</span>
+                </div>
+                <div class="hw-result-row hw4-row">
+                    <span class="hw-badge hw4-badge">HW4</span>
+                    <span class="hw-result-text"><strong>"Full Self-Driving-computer 4"</strong> – understøtter <strong>FSD Supervised</strong></span>
+                </div>
+            </div>
+
+            <div class="hw-caveat">
+                Teksten med HW3 eller HW4 passer måske ikke 100% – brug sund fornuft til at afgøre om du har HW3 eller HW4 ud fra hvad der står på skærmen.
+            </div>
+
+            <div class="hw-photo">
+                <img src="/images/fsd-hardware.png" alt="Tesla software skærm der viser FSD hardware version" />
+                <p class="hw-photo-caption">Billedet ligner ikke 1:1 hvad du ser, da billedet er fra en amerikansk bil.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="site-footer">
+    <div class="container">
+        <p>Dette er en uofficiel informationsside om Tesla FSD i Danmark. Oplysningerne er vejledende.</p>
+        <p>Tesla, Inc. er ikke tilknyttet denne side.</p>
+        <p class="footer-author">Lavet af <a href="https://m8.dk" target="_blank" rel="noopener">Morten Lomholt Møller</a></p>
+    </div>
+</footer>
+
+@code {
+    private enum HwSelection { None, HW3, HW4, Unknown }
+
+    private HwSelection SelectedHW { get; set; } = HwSelection.None;
+    private string LicensePlate { get; set; } = string.Empty;
+    private bool IsLoading { get; set; }
+    private VehicleCheckResult? PlateResult { get; set; }
+    private string? PlateError { get; set; }
+
+    private void Select(HwSelection hw)
+    {
+        SelectedHW = hw;
+        LicensePlate = string.Empty;
+        PlateResult = null;
+        PlateError = null;
+    }
+
+    private async Task OnPlateKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await CheckPlate();
+    }
+
+    private async Task CheckPlate()
+    {
+        if (string.IsNullOrWhiteSpace(LicensePlate)) return;
+
+        // Sanitize: strip spaces/dashes, uppercase
+        var normalized = LicensePlate.Replace(" ", "").Replace("-", "").ToUpperInvariant();
+
+        // Validate: Danish standard plates are exactly 2 letters + 5 digits
+        if (!System.Text.RegularExpressions.Regex.IsMatch(normalized, @"^[A-Z]{2}\d{5}$"))
+        {
+            PlateError = "Ugyldigt format – danske nummerplader har formatet \"AB 12 345\" (2 bogstaver + 5 tal).";
+            return;
+        }
+
+        IsLoading = true;
+        PlateResult = null;
+        PlateError = null;
+
+        try
+        {
+            PlateResult = await VehicleService.CheckLicensePlateAsync(normalized);
+        }
+        catch
+        {
+            PlateError = "Der opstod en fejl. Prøv igen senere.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

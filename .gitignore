@@ -1,0 +1,22 @@
+## .NET build outputs
+bin/
+obj/
+
+## User-specific secrets (never commit these)
+appsettings.Production.json
+appsettings.Development.json
+appsettings.*.local.json
+**/secrets.json
+
+## dotnet user secrets
+.microsoft.dotnet-user-secrets
+
+## VS / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+## OS
+.DS_Store
+Thumbs.db
