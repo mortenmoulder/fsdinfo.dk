@@ -77,7 +77,10 @@ public sealed class SuggestionService : ISuggestionService
         using var smtp = new SmtpClient();
         try
         {
-            await smtp.ConnectAsync(smtpHost, smtpPort, SecureSocketOptions.Auto);
+            var useSsl = bool.TryParse(_config["Email:UseSsl"], out var ssl) && ssl;
+            var socketOptions = useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.None;
+
+            await smtp.ConnectAsync(smtpHost, smtpPort, socketOptions);
             if (!string.IsNullOrEmpty(smtpUser))
                 await smtp.AuthenticateAsync(smtpUser, smtpPass ?? string.Empty);
             await smtp.SendAsync(message);
